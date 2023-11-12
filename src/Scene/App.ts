@@ -58,6 +58,13 @@ export class App {
         this.currentView = 2;
         this.clearView1();
         this.clearView3();
+        const mixedObjects = this.generateRandomMixedObjects();
+        this.displayMixedObjects(mixedObjects);
+
+        this.spriteAnimationIntervalID = setInterval(() => {
+            const mixedObjects = this.generateRandomMixedObjects();
+            this.displayMixedObjects(mixedObjects);
+        }, 2000);
     }
 
     switchTask3() {
@@ -91,6 +98,61 @@ export class App {
 
         canvas.style.height = newHeight + 'px';
         canvas.style.width = newWidth + 'px';
+    }
+
+    generateRandomMixedObjects(): MixedObject[] {
+        const objects: MixedObject[] = [];
+        const numberOfObjects = Math.floor(Math.random() * 5) + 1; // Random number of objects
+        const emoticonsArray = [":D", "^_^", "O_O", ":P", "$_$"];
+        for (let i = 0; i < numberOfObjects; i++) {
+            const isText = Math.random() > 0.5;
+            if (isText) {
+                objects.push({
+                    type: 'text',
+                    content: emoticonsArray[Math.floor(Math.random() * 5)],
+                    fontSize: Math.floor(Math.random() * 24) + 12
+                });
+            } else {
+                objects.push({
+                    type: 'image',
+                    content: "assets/ball" + String((Math.floor(Math.random() * 5) + 1)) + ".png" // Replace with actual image paths
+                });
+            }
+        }
+
+        return objects;
+    }
+
+    displayMixedObjects(objects: MixedObject[]) {
+        const SPRITE_HEIGHT = 100;
+        const SPRITE_WIDTH = 100;
+        let xOffset = 0;
+        while (this.containerTask2.children.length > 0) {
+            this.containerTask2.removeChild(this.containerTask2.getChildAt(0));
+        }
+        objects.forEach(obj => {
+            if (obj.type === 'text') {
+                const text = new PIXI.Text(obj.content, {fontSize: obj.fontSize, fill: '#ffffff'});
+                text.x = xOffset;
+                text.y = (SPRITE_HEIGHT - text.height) / 2;
+                xOffset += text.width + 5;
+
+                this.containerTask2.addChild(text);
+            } else if (obj.type === 'image') {
+                const sprite = PIXI.Sprite.from(obj.content);
+                sprite.x = xOffset;
+                sprite.width = SPRITE_WIDTH;
+                sprite.height = SPRITE_HEIGHT;
+                xOffset += sprite.width + 5;
+                this.containerTask2.addChild(sprite);
+            }
+        });
+        if (this.containerTask2.height < SPRITE_HEIGHT) {
+            this.containerTask2.y = (this.app.screen.height - this.containerTask2.height - SPRITE_HEIGHT) / 2;
+        } else {
+            this.containerTask2.y = (this.app.screen.height - this.containerTask2.height) / 2;
+        }
+        this.containerTask2.x = (this.app.screen.width - this.containerTask2.width) / 2;
     }
 
     clearView1(): void {
@@ -194,6 +256,13 @@ export class App {
     }
 
     private clearView2(): void {
+        if (this.spriteAnimationIntervalID != undefined) {
+            clearInterval(this.spriteAnimationIntervalID);
+            this.spriteAnimationIntervalID = undefined; // Reset the interval ID
+        }
+        while (this.containerTask2.children.length > 0) {
+            this.containerTask2.removeChild(this.containerTask2.getChildAt(0));
+        }
     }
 
     private clearView3(): void {
@@ -259,3 +328,9 @@ export class App {
         }
     }
 }
+
+type MixedObject = {
+    type: 'text' | 'image',
+    content: string, // URL for images, text content for text
+    fontSize?: number // Only for text
+};
