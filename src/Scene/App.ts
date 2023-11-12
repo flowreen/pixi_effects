@@ -6,15 +6,19 @@ import * as PIXI from 'pixi.js';
  */
 export class App {
     app: PIXI.Application<PIXI.ICanvas>;
+    spritePool: PIXI.Sprite[] = [];
     spriteStack: PIXI.Sprite[] = [];
     secondStack: PIXI.Sprite[] = [];
     topCardZIndex: number = 0;
     stackCountText: PIXI.Text | undefined;
     fpsText: PIXI.Text | undefined;
+    animationTickersArray: PIXI.Ticker [] = [];
+    spriteAnimationIntervalID: NodeJS.Timeout | undefined;
     containerTask1 = new PIXI.Container();
     containerTask2 = new PIXI.Container();
     containerTask3 = new PIXI.Container();
     overlayButtons = new PIXI.Container();
+    currentView = 1;
 
     constructor() {
         this.app = new PIXI.Application({background: '#1099bb'});
@@ -26,12 +30,43 @@ export class App {
         this.app.stage.addChild(this.containerTask3);
         this.app.stage.addChild(this.overlayButtons);
 
-        this.switchTask1();
+        this.createOverlay();
+
+        this.showTask1();
     }
 
-    switchTask1(){
+    showTask1() {
         this.initializeSpriteStack();
         this.createTextElements();
+    }
+
+    switchTask1() {
+        if (this.currentView == 1) {
+            return;
+        }
+        this.currentView = 1;
+        this.clearView2();
+        this.clearView3();
+        this.initializeSpriteStack();
+        this.createTextElements();
+    }
+
+    switchTask2() {
+        if (this.currentView == 2) {
+            return;
+        }
+        this.currentView = 2;
+        this.clearView1();
+        this.clearView3();
+    }
+
+    switchTask3() {
+        if (this.currentView == 3) {
+            return;
+        }
+        this.currentView = 3;
+        this.clearView1();
+        this.clearView2();
     }
 
     /**
@@ -58,6 +93,62 @@ export class App {
         canvas.style.width = newWidth + 'px';
     }
 
+    clearView1(): void {
+        if (this.spriteAnimationIntervalID != undefined) {
+            clearInterval(this.spriteAnimationIntervalID);
+            this.spriteAnimationIntervalID = undefined; // Reset the interval ID
+        }
+        for (let i = 0; i < this.animationTickersArray.length; i++) {
+            this.animationTickersArray[i].stop();
+        }
+        this.animationTickersArray = [];
+        if (this.stackCountText) {
+            this.containerTask1.removeChild(this.stackCountText);
+            this.stackCountText = undefined;
+        }
+        if (this.fpsText) {
+            this.containerTask1.removeChild(this.fpsText);
+            this.fpsText = undefined;
+        }
+        while (this.containerTask1.children.length > 0) {
+            const sprite = this.containerTask1.getChildAt(0);
+            this.releaseSprite(sprite as PIXI.Sprite);
+            this.containerTask1.removeChild(sprite);
+        }
+        this.spriteStack = [];
+        this.secondStack = [];
+    }
+
+    private createOverlay(): void {
+        let button;
+        button = PIXI.Sprite.from('assets/ball1.png');
+        button.width = 50;
+        button.height = 50;
+        button.interactive = true;
+        button.x = (this.app.screen.width - 50);
+        button.y = (this.app.screen.height / 2 - 100);
+        button.on('click', this.switchTask1.bind(this));
+        this.overlayButtons.addChild(button);
+
+        button = PIXI.Sprite.from('assets/ball2.png');
+        button.width = 50;
+        button.height = 50;
+        button.interactive = true;
+        button.x = (this.app.screen.width - 50);
+        button.y = (this.app.screen.height / 2);
+        button.on('click', this.switchTask2.bind(this));
+        this.overlayButtons.addChild(button);
+
+        button = PIXI.Sprite.from('assets/ball3.png');
+        button.width = 50;
+        button.height = 50;
+        button.interactive = true;
+        button.x = (this.app.screen.width - 50);
+        button.y = (this.app.screen.height / 2 + 100);
+        button.on('click', this.switchTask3.bind(this));
+        this.overlayButtons.addChild(button);
+    }
+
     private initializeCanvas() {
         // Enable PixiJS Chrome extension initialization code
         (globalThis as any).__PIXI_APP__ = this.app;
@@ -74,23 +165,44 @@ export class App {
         this.windowResize(canvas);
     }
 
-    private initializeSpriteStack() {
-        this.topCardZIndex = 0;
+    private getSprite(): PIXI.Sprite {
+        if (this.spritePool.length > 0) {
+            return this.spritePool.pop()!;
+        } else {
+            return PIXI.Sprite.from("assets/sprite.webp");
+        }
+    }
+
+    private releaseSprite(sprite: PIXI.Sprite): void {
+        this.spritePool.push(sprite);
+    }
+
+    private createSprites(): void {
         const TOTAL_SPRITES = 144;
         const SPRITE_WIDTH = 150;
         const SPRITE_HEIGHT = 150;
         for (let i = 0; i < TOTAL_SPRITES; i++) {
-            const sprite = PIXI.Sprite.from("assets/sprite.webp");
+            const sprite = this.getSprite();
             sprite.width = SPRITE_WIDTH;
             sprite.height = SPRITE_HEIGHT;
+            sprite.x = 0;
             sprite.y = i;
-            this.topCardZIndex++;
-            sprite.zIndex = this.topCardZIndex;
-            this.topCardZIndex = sprite.zIndex;
+            sprite.zIndex = ++this.topCardZIndex;
             this.spriteStack.push(sprite);
             this.containerTask1.addChild(sprite);
         }
-        setInterval(() => {
+    }
+
+    private clearView2(): void {
+    }
+
+    private clearView3(): void {
+    }
+
+    private initializeSpriteStack() {
+        this.topCardZIndex = 0;
+        this.createSprites();
+        this.spriteAnimationIntervalID = setInterval(() => {
             this.animateSprite();
         }, 1000); // Trigger every 1000 milliseconds (1 second)
     }
@@ -130,6 +242,7 @@ export class App {
 
             // Use PixiJS's ticker for the animation
             const ticker = new PIXI.Ticker();
+            this.animationTickersArray.push(ticker);
             ticker.add((delta) => {
                 if (sprite) {
                     const moveAmount = delta / animationDuration;
