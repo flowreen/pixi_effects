@@ -1,4 +1,6 @@
 import * as PIXI from 'pixi.js';
+import {ParticleContainer} from 'pixi.js';
+import {Emitter} from "@pixi/particle-emitter";
 
 /**
  * The App class initializes the PixiJS application and sets up the game.
@@ -16,9 +18,10 @@ export class App {
     spriteAnimationIntervalID: NodeJS.Timeout | undefined;
     containerTask1 = new PIXI.Container();
     containerTask2 = new PIXI.Container();
-    containerTask3 = new PIXI.Container();
+    containerTask3 = new ParticleContainer();
     overlayButtons = new PIXI.Container();
     currentView = 1;
+    fireEffect: FireEffect | undefined;
 
     constructor() {
         this.app = new PIXI.Application({background: '#1099bb'});
@@ -74,11 +77,18 @@ export class App {
         this.currentView = 3;
         this.clearView1();
         this.clearView2();
+        if (!this.fireEffect) {
+            this.fireEffect = new FireEffect(this.app, this.containerTask3);
+            this.app.ticker.add((delta) => this.fireEffect?.update(delta));
+        }
+        if (this.fireEffect.emitter) {
+            this.fireEffect.emitter.emit = true;
+        }
     }
 
     /**
      * Resizes canvas size according to window size, From EVENT_RESIZE events
-     * @param canvas {Canvas} the canvas instance to be resized
+     * @param canvas {HTMLCanvasElement} the canvas instance to be resized
      */
     windowResize(canvas: HTMLCanvasElement) {
         const SCREEN_WIDTH = 1024;
@@ -87,7 +97,7 @@ export class App {
         const containerWidth = window.innerWidth;
         const containerHeight = window.innerHeight;
         let newHeight = containerWidth / ASPECT_RATIO;
-        let newWidth = 0;
+        let newWidth;
 
         if (newHeight > containerHeight) {
             newHeight = containerHeight;
@@ -136,7 +146,6 @@ export class App {
                 text.x = xOffset;
                 text.y = (SPRITE_HEIGHT - text.height) / 2;
                 xOffset += text.width + 5;
-
                 this.containerTask2.addChild(text);
             } else if (obj.type === 'image') {
                 const sprite = PIXI.Sprite.from(obj.content);
@@ -186,7 +195,7 @@ export class App {
         button = PIXI.Sprite.from('assets/ball1.png');
         button.width = 50;
         button.height = 50;
-        button.interactive = true;
+        button.eventMode = "static";
         button.x = (this.app.screen.width - 50);
         button.y = (this.app.screen.height / 2 - 100);
         button.on('click', this.switchTask1.bind(this));
@@ -195,7 +204,7 @@ export class App {
         button = PIXI.Sprite.from('assets/ball2.png');
         button.width = 50;
         button.height = 50;
-        button.interactive = true;
+        button.eventMode = "static";
         button.x = (this.app.screen.width - 50);
         button.y = (this.app.screen.height / 2);
         button.on('click', this.switchTask2.bind(this));
@@ -204,7 +213,7 @@ export class App {
         button = PIXI.Sprite.from('assets/ball3.png');
         button.width = 50;
         button.height = 50;
-        button.interactive = true;
+        button.eventMode = "static";
         button.x = (this.app.screen.width - 50);
         button.y = (this.app.screen.height / 2 + 100);
         button.on('click', this.switchTask3.bind(this));
@@ -266,6 +275,10 @@ export class App {
     }
 
     private clearView3(): void {
+        if (this.fireEffect && this.fireEffect.emitter) {
+            this.fireEffect.emitter.emit = false;
+            this.fireEffect.emitter.cleanup();
+        }
     }
 
     private initializeSpriteStack() {
@@ -309,7 +322,7 @@ export class App {
             // Animation duration in milliseconds
             const animationDuration = 20;
 
-            // Use PixiJS's ticker for the animation
+            // Use PixiJS ticker for the animation
             const ticker = new PIXI.Ticker();
             this.animationTickersArray.push(ticker);
             ticker.add((delta) => {
@@ -334,3 +347,133 @@ type MixedObject = {
     content: string, // URL for images, text content for text
     fontSize?: number // Only for text
 };
+
+class FireEffect {
+    emitter: Emitter | undefined;
+
+    constructor(private app: PIXI.Application, container: ParticleContainer) {
+        this.createFireEffect(container);
+    }
+
+    public update(delta: number) {
+        this.emitter?.update(delta * 0.001); // Update the emitter
+    }
+
+    private createFireEffect(container: ParticleContainer) {
+        container.x = (this.app.screen.width - container.width) / 2;
+        container.y = (this.app.screen.height - container.height) / 2;
+
+        const emitterConfig = {
+            "lifetime": {
+                "min": 0.1,
+                "max": 0.15
+            },
+            "frequency": 0.001,
+            "emitterLifetime": 0,
+            "maxParticles": 10,
+            "pos": {
+                "x": 0,
+                "y": 0
+            },
+            "behaviors": [
+                {
+                    "type": "alpha",
+                    "config": {
+                        "alpha": {
+                            "list": [
+                                {
+                                    "time": 0,
+                                    "value": 0.85
+                                },
+                                {
+                                    "time": 1,
+                                    "value": 0
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "type": "moveSpeedStatic",
+                    "config": {
+                        "min": 500,
+                        "max": 500
+                    }
+                },
+                {
+                    "type": "scale",
+                    "config": {
+                        "scale": {
+                            "list": [
+                                {
+                                    "time": 0,
+                                    "value": 0.25
+                                },
+                                {
+                                    "time": 1,
+                                    "value": 0.75
+                                }
+                            ]
+                        },
+                        "minMult": 1
+                    }
+                },
+                {
+                    "type": "color",
+                    "config": {
+                        "color": {
+                            "list": [
+                                {
+                                    "time": 0,
+                                    "value": "ffff00"
+                                },
+                                {
+                                    "time": 0.50,
+                                    "value": "32cd32"
+                                },
+                                {
+                                    "time": 1,
+                                    "value": "00ffff"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "type": "rotation",
+                    "config": {
+                        "accel": 0,
+                        "minSpeed": 50,
+                        "maxSpeed": 50,
+                        "minStart": 265,
+                        "maxStart": 275
+                    }
+                },
+                {
+                    "type": "textureRandom",
+                    "config": {
+                        "textures": [
+                            "assets/Fire.png"
+                        ]
+                    }
+                },
+                {
+                    "type": "spawnShape",
+                    "config": {
+                        "type": "torus",
+                        "data": {
+                            "x": 0,
+                            "y": 0,
+                            "radius": 10,
+                            "innerRadius": 0,
+                            "affectRotation": false
+                        }
+                    }
+                }
+            ]
+        };
+
+        this.emitter = new Emitter(container, emitterConfig);
+        this.emitter.playOnce();
+    }
+}
